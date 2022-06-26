@@ -1,10 +1,26 @@
 # servico-clojure
 
-A Clojure library designed to ... well, that part is up to you.
+Clojure service of a Rest API using the pedestalio library.
 
 ## Usage
 
 FIXME
+
+## Projeto
+This project was based on video lessons by Cesar Alcancio.
+
+### Link
+https://www.youtube.com/watch?v=GeLtHKLe73c&list=PLcjDvROHY58NpVqhOyafHL8iTmGGDT9DZ&index=1
+
+### Github Project
+https://github.com/cesaralcancio/servico-clojure
+
+### GitHub
+https://github.com/cesaralcancio/servico-clojure
+
+### Run
+
+Must run manually by repl.
 
 ## License
 

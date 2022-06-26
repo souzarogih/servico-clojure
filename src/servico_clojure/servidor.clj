@@ -1,76 +1,75 @@
 (ns servico-clojure.servidor
-  (:require [io.pedestal.http.route :as route]
-            [io.pedestal.http :as http]
+  (:require [io.pedestal.http :as http]
+            [servico-clojure.database :as database]
+            [io.pedestal.interceptor :as i]
             [io.pedestal.test :as test]
-            [servico-clojure.database :as database]))
+            [com.stuartsierra.component :as component]))
 
-; {id {tarefa_id, tarefa_nome, tarefa_status}}
 
-(defn assoc-store [context]
-  (update context :request assoc :store database/store))
 
-(def db-interceptor
-  {:name :db-interceptor
-   :enter assoc-store})
+(defrecord Servidor [database rotas]
+  component/Lifecycle
 
-(defn lista-tarefas [request]
-  {:status 200 :body @(:store request)})
+  (start [this]
 
-(defn criar-tarefa-mapa [uuid nome status]
-  {:id uuid :nome nome :status status})
+    (println "Starting Server in port 9999")
 
-(defn criar-tarefa [request]
-  (let [uuid (java.util.UUID/randomUUID)
-        nome (get-in request [:query-params :nome])
-        status (get-in request [:query-params :status])
-        tarefa (criar-tarefa-mapa uuid nome status)
-        store (:store request)]
-    (swap! store assoc uuid tarefa)
-    {:status 200 :body {:mensagem "Tarefa adicionada com sucesso!"
-                        :tarefa tarefa}}))
+    (defn assoc-store [context]
+      (update context :request assoc :store (:store database)))
 
-(defn funcao-hello [request]
-  {:status 200 :body (str "Hello World " (get-in request [:query-params :name] "Everybady"))})
+    (def db-interceptor
+      {:name  :db-interceptor
+       :enter assoc-store})
 
-(def routes (route/expand-routes #{["/hello" :get funcao-hello :route-name :hello-world]
-                                   ["/tarefa" :post  [db-interceptor criar-tarefa] :route-name :criar-tarefa]
-                                   ["/tarefa" :get [db-interceptor lista-tarefas] :route-name :lista-tarefas]}))
+    (def service-map-base {::http/routes (:endpoints rotas)
+                           ::http/port   9999
+                           ::http/type   :jetty
+                           ::http/join   false})
 
-(def service-map {::http/routes routes
-                  ::http/port   9999
-                  ::http/type   :jetty
-                  ::http/join   false})
+    (def service-map (-> service-map-base
+                         (http/default-interceptors)
+                         (update ::http/interceptors conj (i/interceptor db-interceptor))))
 
-(defonce server (atom nil))
+    (defonce server (atom nil))
 
-(defn start-server []
-  (reset! server (http/start (http/create-server service-map))))
+    (defn start-server []
+      (reset! server (http/start (http/create-server service-map))))
 
-(defn test-request [verb url]
-  (test/response-for (::http/service-fn @server) verb url))
+    (defn test-request [verb url]
+      (test/response-for (::http/service-fn @server) verb url))
 
-(defn stop-server []
-  (http/stop @server))
+    (defn stop-server []
+      (http/stop @server))
 
-(defn restart-server []
-  (stop-server)
-  (start-server))
+    (defn restart-server []
+      (stop-server)
+      (start-server))
 
-(start-server)
-;(restart-server)
-(println "Server started/restarted")
+    ;(restart-server)
+    ;(start-server)
+    ;(start-now)
+    ;(println "Server started/restarted")
 
-(clojure.edn/read-string (test-request :get "/tarefa"))
+    (defn start []
+      (try
+        (start-server)
+        (catch Exception e (println "Erro ao executar start" (.getMessage e))))
 
-;(println (test-request :get "/hello?name=Cesar"))
-;(println (test-request :post "/tarefa?nome=Correr&status=pendente"))
-;(println (test-request :post "/tarefa?nome=Correr&status=feito"))
+      (try
+        (restart-server)
+        (catch Exception e (println "Erro ao executar restart" (.getMessage e)))))
 
-;Lista todas as tarefas
-;(println (test-request :get "/tarefa"))
+    (start)
 
-(println @database/store)
+    (assoc this :test-request test-request))
 
-;(test-request :get "/hello?name=Cesar")
+  (stop [this]
+    (assoc this :test-request nil))
 
+  )
+
+(defn new-servidor []
+  (map->Servidor {}))
+
+;(println @database/store)
 ;(println "Started server http")
